@@ -1,0 +1,120 @@
+Apresento para vocês meus caros colegas a solução definitiva para realizar rotação de IPs no servidor de hospedagem de sites com painel CPanel + Exim.
+
+Antes de disponibilizar o código, eu testei por quase 1 ano. Sendo assim, garanto que realmente funciona. smiley
+
+Bem, primeiro quero deixar bem claro algumas situações:
+
+Esta solução é de minha autoria e testada no CPanel 11, Exim 4 e servidor linux CentOS 6. O uso do script que estou disponibilizando é de sua total responsabilidade.
+Eu sou totalmente contra SPAM e as regras de boas maneiras de uso de e-mail devem ser obedecidas.
+O intuito deste script é fazer com que o servidor trabalhe com melhor performance e não deve ser usado para praticar SPAM.
+Se você estiver com a necessidade de rotacionar IPs no seu servidor, continue lento este artigo que você irá aprender sobre:
+
+O que preciso saber antes de iniciar a configuração de rotação de IPs?
+Por que devo rotacionar IPs em um servidor?
+Precisa fazer alguma alteração de configuração no CPanel?
+Como configurar o meu range de IPs no script de rotação?
+Como posso definir o intervalo de tempo de rotação?
+Você deve ficar ciente que a rotação de IPs não isenta as demais configurações do servidor para ter um bom nível de entrega de e-mail. Ou seja, ainda será necessário configurar corretamente o rDNS, regras de SPF e DKIM.
+
+A união de todas essas configurações aliada a rotação de IPs, certamente você terá sucesso nas entregas de e-mail do seu servidor.
+
+Ah! Antes que eu me esqueça, você terá, obrigatoriamente, acesso nível root via terminal ao servidor. 
+
+Por que devo rotacionar IPs em um servidor?
+Vamos supor que você envie 1.000 e-mails por hora e que o servidor possui apenas 1 IP. Logo, este único IP vai receber uma carga muito alta de envio, cerca de 24.000 por dia!
+
+Quando se trata de um número baixo, não há problema algum. Na verdade nem precisa se preocupar.
+
+Agora, imagine um servidor com 100 sites hospedados e cada site enviando 500 e-mails por hora. Teremos uma sobrecarga em um único IP muito grande, não acha?
+
+Mas, se você adicionar mais um IP neste mesmo servidor, ficando 2, logo 1.000 disparos de e-mails serão rateados entre 2 IPs, ficando 500 para cada, teoricamente.
+
+Por que teoricamente? Por que o script que disponibilizei para você possui uma função randômica para escolher o IP. Sendo assim, há possibilidade de ser sorteado mais um IP do que o outro e vice-versa. Dessa forma, o rateamento de disparo não é exato, e nem deve ser.
+
+Mas você deve estar se perguntando qual seria o problema de enviar muitos e-mails de um único IP levando em consideração que estes e-mails seriam realmente autênticos e excluindo a possibilidade de SPAM.
+
+Ora... ora! Os maiores servidores de e-mail como GMail, Hotmail, Yahoo, etc., possuem um limite de recebimento. Sendo assim, se você disparar uma carga alta de e-mail sob um único IP, e esta quantidade ultrapassar os limites estabelecidos por estes servidores, é capaz, ou quase certeza, de que eles irão ignorar os e-mails que ultrapassaram o limite.
+
+E quando isso acontece meu amigo, eles ficarão sempre de olho nos seus envios, suspeitando-os! O Hotmail é mestre nisso.
+
+Mas, mesmo rotacionando IPs você pode ultrapassar estes limites a depender do seu volume de envio.
+
+Os servidores que citei, podem, também, bloquear todo o seu bloco de IP com essas ações.
+
+Ou seja, você nunca estará 100% seguro, mas o que a rotação de IP faz é tentar amenizar estes futuros problemas. Digo isso por experiência própria. frown
+
+Configurando o CPanel
+Antes de mais nada, você precisa fazer algumas configurações (calma, coisa simples!) no CPanel.
+
+1) Desativar a opção Send mail from account’s dedicated IP address
+2) Ativar a opção Reference /etc/mailhelo for outgoing SMTP HELO
+3) Ativar a opção Reference /etc/mailips for outgoing SMTP connections
+
+Para alterar essas opções, acesse o seu WHM e localize no menu a esquerda a opção Service Configuration > Exim Configuration Manager.
+
+Feito isso, no segundo menu horizontal, selecione Domain and IPs. As opções serão exibidas.
+
+Para entender mais sobre essas configurações, acesse este link na documentação do CPanel.
+
+A tão esperada solução definitiva de rotação de IPs para servidor CPanel + Exim!
+Veja agora sem mais rodeios...
+
+#!/bin/bash
+#script to change the ip of outgoing e-mail exim
+#you must add a line in crontab 
+#*/15 * * * * sh /your_path/eximrandomips.sh
+#powered by Tiago Matos - web developer :: www.tiagomatos.com
+ 
+#path
+path=/etc/mailips
+ 
+#ip list
+ips=("XXX.XXX.XXX.XXX" "XXX.XXX.XXX.XXX")
+ 
+#read current ip
+mailips=`head -n 1 ${path}`
+current_ip=${mailips##*: }
+ 
+#delete current ip of ips array
+for i in ${!ips[@]}; do
+    if [ "${ips[$i]}" == ${current_ip} ]; then
+        unset ips[$i]
+    fi
+done
+ 
+#shuffle ips
+ips_shuf=($(shuf -e ${ips[*]}))
+ 
+#write new ip in mailips
+echo "*:" ${ips_shuf[0]} > ${path}
+Bom, aí está o script completo. É isso mesmo! Acredite! É o script completo... laugh
+
+Na linha 08, eu determino o caminho (/etc/mailips) do arquivo que o CPanel usa para ler as personalizações de IPs de cada domínio hospedado no servidor. Mas neste caso, utilizei o critério global para todos os domínios.
+
+A linha 11 é onde você deve mexer. Coloque os seus IPs seguindo essa sintaxe ("ip01" "ip02" "ip03" ...). Liste quantos IPs desejar, mas desde que eles existam no seu servidor.
+
+A linha 14 e 15, eu faço a leitura do IP que já está em uso para que o script não sorteie novamente este mesmo IP.
+
+Da 18 à 22, eu excluo da lista de IPs o IP usado atualmente.
+
+A linha 25 é onde faço o sorteio do novo IP.
+
+E por fim, na linha 28, eu imprimo o novo IP no arquivo citado na linha 08, o mailips.
+
+E agora, o que faço com este arquivo?
+Após configurado, salve o arquivo em um diretório seguro no seu servidor com o nome "eximrandomips.sh", sem as aspas.
+
+E o intervalo de rotação?
+Simples, basta você adicionar nas suas regras cron a seguinte linha:
+
+*/15 * * * * sh /your_path/eximrandomips.sh
+Neste caso, estou dizendo a minha tarefa cron, que execute o script de 15 em 15 minutos (*/15).
+
+Lembre-se também de configurar o caminho completo do script. Se por exemplo você salvou o arquivo no diretório /root, ficará assim:
+
+*/15 * * * * sh /root/eximrandomips.sh
+Fácil não? Mamão com açúcar! surprise
+
+E você tem uma solução melhor? Tem alguma dúvida/sugestão? Por favor, comente para que este post fique mais atrativo. Isso será bastante enriquecedor para o tema, te garanto!
+
+Github: https://github.com/tiagomatosweb/ip-rotativo-cpanel-exim
